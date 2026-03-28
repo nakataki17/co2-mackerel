@@ -1,0 +1,35 @@
+[Unit]
+Description=Chissoku to Mackerel Forwarder
+Documentation=https://github.com/nakataki17/co2-mackerel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=chissoku
+Group=dialout
+
+# 実行ファイルのパス（symlink 経由でバージョン管理）
+ExecStart=/opt/chissoku-forwarder/current/forwarder -config /opt/chissoku-forwarder/config/config.yaml
+
+# 環境変数ファイル（API キーなど）
+EnvironmentFile=/etc/chissoku-forwarder/forwarder.env
+
+# 再起動設定
+Restart=always
+RestartSec=5
+
+# セキュリティ設定
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/chissoku-forwarder
+PrivateTmp=true
+
+# ログ設定
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=chissoku-forwarder
+
+[Install]
+WantedBy=multi-user.target

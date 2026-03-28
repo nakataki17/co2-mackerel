@@ -1,0 +1,54 @@
+# chissoku-mackerel-forwarder 設定ファイル
+
+# シリアルデバイスのパス
+device: /dev/ttyACM0
+
+# Mackerel 設定
+mackerel:
+  # Mackerel のサービス名
+  # メトリクスはこのサービスに属します
+  service_name: environmental-sensors
+
+  # API キーの環境変数名
+  # 実際の API キーは環境変数で指定してください
+  api_key_env: MACKEREL_API_KEY
+
+  # メトリクス送信間隔（秒）
+  # Mackerel は 1 分粒度が推奨です
+  post_interval_sec: 60
+
+  # API リクエストのタイムアウト（秒）
+  timeout_sec: 30
+
+# メトリクス設定
+metrics:
+  # メトリクス名のプレフィックス
+  # 実際のメトリクス名: {prefix}.{co2|temperature|humidity}
+  # 例: co2.living.ppm, co2.living.temperature_c, co2.living.humidity_pct
+  prefix: co2.living
+
+  # メトリクス名のサフィックス
+  # 個別にカスタマイズしたい場合は変更してください
+  names:
+    co2: ppm
+    temperature: temperature_c
+    humidity: humidity_pct
+
+# chissoku 設定
+chissoku:
+  # chissoku バイナリのパス
+  # デプロイ先に合わせて調整してください
+  bin_path: /opt/chissoku-forwarder/current/chissoku
+
+  # quiet モード（余分なログを出力しない）
+  quiet: true
+
+  # stdout 出力間隔（秒）
+  # これがメトリクスの取得頻度になります
+  stdout_interval_sec: 60
+
+  # タグ
+  # 複数のセンサを区別するために使用できます
+  tags:
+    - Living
+    - Floor1
