@@ -2,9 +2,11 @@
 package chissoku
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"os/exec"
 )
 
 // RunOptions は milestone 1 では最小限のフィールドだけ用意してある。
@@ -12,20 +14,36 @@ import (
 type RunOptions struct {
 	// BinPath は chissoku 実行ファイルのパス。
 	BinPath string
-	// Device はシリアルデバイス（例: /dev/ttyACM0）。chissoku に渡す引数は実装者が README / chissoku --help で確認すること。
+	// Device はシリアルデバイス（例: /dev/ttyACM0）。
 	Device string
 }
 
-// ReadOneLine は chissoku を起動し、stdout から最初の 1 行を読んで返す（milestone 1 用の最小 API）。
-//
-// TODO(milestone-1): os/exec の CommandContext で子プロセスを起動する。
-// - 引数例: デバイス指定が必要なら chissoku の実際の CLI に合わせる（--device など）。
-// - Stdout をパイプし、bufio.NewScanner や ReadLine で 1 行読む。
-// - プロセスがすぐ終了しないよう、chissoku は継続出力するので「1 行読めたら」プロセスを切ってよいかは chissoku の挙動に合わせて判断する。
+// ReadOneLine は chissoku を起動し、stdout から最初の 1 行分の JSON を返す。
+// chissoku の --stdout.iterations=1 で 1 回出力後に子プロセスが終了する前提。
 func ReadOneLine(ctx context.Context, opt RunOptions) ([]byte, error) {
-	_ = ctx
-	_ = opt
-	return nil, fmt.Errorf("TODO(milestone-1): ReadOneLine を実装する")
+	if opt.BinPath == "" {
+		return nil, fmt.Errorf("chissoku: BinPath is empty (set CHISSOKU_BIN)")
+	}
+	device := opt.Device
+	if device == "" {
+		device = "/dev/ttyACM0"
+	}
+	// README: ./chissoku -q /dev/ttyACM0 — 1 行だけ欲しいので iterations=1。待ち時間を抑えるため interval=1。
+	args := []string{
+		"-q",
+		"--stdout.interval=1",
+		"--stdout.iterations=1",
+		device,
+	}
+	cmd := exec.CommandContext(ctx, opt.BinPath, args...)
+	out, err := cmd.Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("chissoku: %w (stderr: %s)", err, bytes.TrimSpace(ee.Stderr))
+		}
+		return nil, fmt.Errorf("chissoku: %w", err)
+	}
+	return bytes.TrimSpace(out), nil
 }
 
 // StdoutReader は milestone 以降で「継続的に stdout を読む」ために使う予定のプレースホルダ。
