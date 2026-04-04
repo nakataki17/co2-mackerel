@@ -10,9 +10,10 @@ User=chissoku
 Group=dialout
 
 # 実行ファイルのパス（symlink 経由でバージョン管理）
-ExecStart=/opt/chissoku-forwarder/current/forwarder -config /opt/chissoku-forwarder/config/config.yaml
+# 設定は EnvironmentFile のみ（手順は docs/deployment.md）
+ExecStart=/opt/chissoku-forwarder/current/forwarder
 
-# 環境変数ファイル（API キーなど）
+# 環境変数ファイル（MACKEREL_API_KEY, CHISSOKU_BIN など）
 EnvironmentFile=/etc/chissoku-forwarder/forwarder.env
 
 # 再起動設定

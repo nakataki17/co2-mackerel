@@ -20,7 +20,7 @@ type ServiceMetric struct {
 
 // BuildMetrics は reading を 3 本のサービスメトリクスに変換する。
 // prefix はメトリクス名の先頭（例: co2.living）。空なら co2.living を使う。
-// 名前は {prefix}.ppm, {prefix}.temperature_c, {prefix}.humidity_pct（config.example.yaml の names に合わせる）。
+// 名前は {prefix}.ppm, {prefix}.temperature_c, {prefix}.humidity_pct（docs/spec.md のメトリクス命名に合わせる）。
 func BuildMetrics(prefix string, r *reading.Reading) ([]ServiceMetric, error) {
 	if r == nil {
 		return nil, fmt.Errorf("mackerel: reading is nil")

@@ -100,7 +100,7 @@ Mackerel Service Metrics API への POST リクエスト:
 co2.{location}.{metric}
 ```
 
-- `{location}`: 設定ファイルで指定（例: `living`, `room1`）
+- `{location}`: 環境変数 `MACKEREL_METRICS_PREFIX` の値に含めて表現する（例: `co2.living` の `living` 部分）
 - `{metric}`: `ppm`, `temperature_c`, `humidity_pct`
 
 例: `co2.living.ppm`, `co2.living.temperature_c`, `co2.living.humidity_pct`
@@ -151,38 +151,22 @@ Mackerel の推奨する 1 分粒度に合わせ、API 429 を回避する。
 
 ## 5. 設定
 
-### 5.1 設定ファイル (config.yaml)
+forwarder は **設定ファイルを読みません**。すべて **環境変数** で指定します（systemd の `EnvironmentFile` などにまとめて書ける）。
 
-```yaml
-device: /dev/ttyACM0
-baud_rate: 9600
+### 5.1 環境変数
 
-mackerel:
-  service_name: environmental-sensors
-  post_interval_sec: 60
-  timeout_sec: 30
+| 変数名 | 説明 | 必須 | 未設定時の挙動 |
+|--------|------|------|----------------|
+| `CHISSOKU_BIN` | chissoku 実行ファイルのパス | 実質必須 | 空だと子プロセスを起動できない |
+| `DEVICE` | シリアルデバイス（例: `/dev/ttyACM0`） | いいえ | `/dev/ttyACM0` |
+| `CHISSOKU_INTERVAL_SEC` | chissoku の `--stdout.interval`（秒） | いいえ | `60` |
+| `MACKEREL_API_KEY` | Mackerel API キー | 送信するなら必須 | 未設定時は POST をスキップ（標準出力のみ） |
+| `MACKEREL_SERVICE_NAME` | 投稿先 Mackerel サービス名 | いいえ | `environmental-sensors` |
+| `MACKEREL_METRICS_PREFIX` | メトリクス名の接頭辞（例: `co2.living` → `co2.living.ppm` など） | いいえ | `co2.living` |
+| `MACKEREL_API_BASE` | Mackerel API のベース URL | いいえ | `https://api.mackerelio.com` |
+| `MACKEREL_TIMEOUT_SEC` | HTTP クライアントのタイムアウト（秒） | いいえ | `30` |
 
-metrics:
-  prefix: co2.living
-  names:
-    co2: ppm
-    temperature: temperature_c
-    humidity: humidity_pct
-
-chissoku:
-  bin_path: /opt/chissoku-forwarder/current/chissoku
-  quiet: true
-  stdout_interval_sec: 60
-  tags:
-    - Living
-```
-
-### 5.2 環境変数
-
-| 変数名 | 説明 | 必須 |
-|-------|-----|-----|
-| `MACKEREL_API_KEY` | Mackerel API キー | 必須 |
-| `DEVICE` | シリアルデバイスパス | オプション（デフォルト: `/dev/ttyACM0`）|
+メトリクス名は `{MACKEREL_METRICS_PREFIX}.ppm` / `.temperature_c` / `.humidity_pct` の 3 本で固定です。
 
 ## 6. 非機能要件
 
