@@ -12,21 +12,15 @@
 ## 前提
 
 - Go（`go.mod` の `go` 行に合わせる）
-- **chissoku** の実行ファイル（開発時はリポジトリ直下に置く想定。下記）
+- **chissoku** の実行ファイル（入手・配置の目安は [config.example.yaml](config.example.yaml) の `chissoku` セクションのコメント）
 
-## chissoku バイナリ
+## 設定
 
-[リリース](https://github.com/northeye/chissoku/releases)の tar を展開し、**リポジトリ直下**に `chissoku` として置き、`chmod +x chissoku` してください。`.gitignore` 対象のためコミットしません。
+[config.example.yaml](config.example.yaml) を `config.yaml` にコピーし、**ファイル内コメント**を見ながら編集してください。YAML にある項目の説明は README では繰り返しません。
 
-## 環境変数
+API キーは平文で `config.yaml` に書かず、環境変数 **`MACKEREL_API_KEY`** に渡します（名前は固定）。
 
-| 変数 | 必須 | 説明 |
-|------|------|------|
-| `CHISSOKU_BIN` | はい | chissoku のパス（例: `./chissoku`）。リポジトリ直下で動かすときは `./chissoku` または `$PWD/chissoku` |
-| `DEVICE` | いいえ | シリアルデバイス。未設定時は `/dev/ttyACM0` |
-| `CHISSOKU_INTERVAL_SEC` | いいえ | chissoku の `--stdout.interval`（秒）。未設定時は `60` |
-
-起動時のカレントディレクトリはリポジトリ直下にしてください（`./chissoku` を使う場合）。
+※ フォワーダーが `config.yaml` をまだ読み込まない場合は、同等の値を環境変数で渡していることがあります。優先順位は実装に従ってください。
 
 ## ビルド・テスト・実行
 
@@ -36,16 +30,12 @@ go test ./...
 ```
 
 ```bash
-export CHISSOKU_BIN="./chissoku"
-export CHISSOKU_INTERVAL_SEC=5   # 試すときは短く
+cp config.example.yaml config.yaml
+# config.yaml と環境変数（API キー等）を用意
 go run ./cmd/forwarder
 ```
 
-`run-local.sh` で同様の環境変数をセットしてから `go run` する例もあります（パスは自分の環境に合わせてください）。
-
-## 設定
-
-本番向けの設定例は [config.example.yaml](config.example.yaml) です（YAML 読み込みは未実装のマイルストーンもあります）。
+`run-local.sh` などで環境を組み立てる例もあります（パスは自分の環境に合わせてください）。
 
 ## ライセンス
 

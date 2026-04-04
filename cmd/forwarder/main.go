@@ -4,13 +4,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
 	"strconv"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/nakataki17/co2-mackerel/internal/chissoku"
+	"github.com/nakataki17/co2-mackerel/internal/mackerel"
 	"github.com/nakataki17/co2-mackerel/internal/reading"
 )
 
@@ -42,13 +46,38 @@ func run(ctx context.Context) error {
 		StdoutIntervalSec: interval,
 	}
 
+	apiKey := os.Getenv("MACKEREL_API_KEY")
+	serviceName := getenvDefault("MACKEREL_SERVICE_NAME", "environmental-sensors")
+	metricsPrefix := getenvDefault("MACKEREL_METRICS_PREFIX", "co2.living")
+	baseURL := getenvDefault("MACKEREL_API_BASE", mackerel.DefaultBaseURL)
+
+	timeout := 30 * time.Second
+	if s := os.Getenv("MACKEREL_TIMEOUT_SEC"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			timeout = time.Duration(v) * time.Second
+		}
+	}
+	httpClient := &http.Client{Timeout: timeout}
+
+	var skipMackerelOnce sync.Once
+
 	return chissoku.StreamLines(ctx, opt, func(line []byte) error {
 		r, err := reading.ParseLine(line)
 		if err != nil {
 			return err
 		}
 		printReading(r)
-		return nil
+		if apiKey == "" {
+			skipMackerelOnce.Do(func() {
+				fmt.Fprintln(os.Stderr, "mackerel: MACKEREL_API_KEY is not set; skipping POST")
+			})
+			return nil
+		}
+		metrics, err := mackerel.BuildMetrics(metricsPrefix, r)
+		if err != nil {
+			return err
+		}
+		return mackerel.PostServiceMetrics(ctx, httpClient, baseURL, serviceName, apiKey, metrics)
 	})
 }
 

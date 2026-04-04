@@ -1,54 +1,64 @@
-# chissoku-mackerel-forwarder 設定ファイル
+# サンプル設定（リポジトリにコミットする）
+#
+# 使い方:
+#   cp config.example.yaml config.yaml
+#   config.yaml を編集（config.yaml は .gitignore し、秘密をコミットしない）
+#
+# 各キーの意味・単位・例はこのファイルのコメントを正とします。README では繰り返しません。
 
-# シリアルデバイスのパス
+# -----------------------------------------------------------------------------
+# シリアルデバイス（UD-CO2S 等が接続されるパス）
+# Linux では多くの場合 /dev/ttyACM0 または /dev/ttyUSB0。WSL ではホスト側のデバイス渡しが必要な場合あり。
+# Windows では COM3 のように指定（chissoku の README 参照）。
+# -----------------------------------------------------------------------------
 device: /dev/ttyACM0
 
-# Mackerel 設定
+# -----------------------------------------------------------------------------
+# Mackerel（サービスメトリクス API）
+# エンドポイント: POST /api/v0/services/{service_name}/tsdb
+# 詳細は docs/spec.md
+# -----------------------------------------------------------------------------
 mackerel:
-  # Mackerel のサービス名
-  # メトリクスはこのサービスに属します
+  # 投稿先の Mackerel サービス名（組織のサービス一覧に存在する名前）
   service_name: environmental-sensors
 
-  # API キーの環境変数名
-  # 実際の API キーは環境変数で指定してください
-  api_key_env: MACKEREL_API_KEY
+  # API キーは設定ファイルに書かず、環境変数 MACKEREL_API_KEY に渡す（名前はアプリ側で固定）
 
-  # メトリクス送信間隔（秒）
-  # Mackerel は 1 分粒度が推奨です
+  # メトリクスをまとめて送る間隔の想定（秒）。Mackerel は 1 分粒度が推奨。
+  # ※ 実装の進行により、送信タイミングは chissoku の出力間隔と一致する場合があります。
   post_interval_sec: 60
 
-  # API リクエストのタイムアウト（秒）
+  # HTTP クライアントのタイムアウト（秒）。ネットワークが不安定な場合は長めに。
   timeout_sec: 30
 
-# メトリクス設定
+# -----------------------------------------------------------------------------
+# メトリクス名（サービスメトリクスとして登録される名前の組み立て）
+# 実際の名前は {prefix}.{names.co2|names.temperature|names.humidity} の3本。
+# -----------------------------------------------------------------------------
 metrics:
-  # メトリクス名のプレフィックス
-  # 実際のメトリクス名: {prefix}.{co2|temperature|humidity}
-  # 例: co2.living.ppm, co2.living.temperature_c, co2.living.humidity_pct
+  # 例: co2.living → co2.living.ppm など
   prefix: co2.living
 
-  # メトリクス名のサフィックス
-  # 個別にカスタマイズしたい場合は変更してください
   names:
     co2: ppm
     temperature: temperature_c
     humidity: humidity_pct
 
-# chissoku 設定
+# -----------------------------------------------------------------------------
+# chissoku 子プロセス
+# バイナリは https://github.com/northeye/chissoku/releases などから取得
+# -----------------------------------------------------------------------------
 chissoku:
-  # chissoku バイナリのパス
-  # デプロイ先に合わせて調整してください
+  # 実行ファイルのパス（開発時はリポジトリ直下の ./chissoku など）
   bin_path: /opt/chissoku-forwarder/current/chissoku
 
-  # quiet モード（余分なログを出力しない）
+  # true のとき -q（標準エラー側の余計な出力を抑える）
   quiet: true
 
-  # stdout 出力間隔（秒）
-  # これがメトリクスの取得頻度になります
+  # stdout に JSON を出す間隔（秒）。センサの取得頻度＝ここが長いほど待つ
   stdout_interval_sec: 60
 
-  # タグ
-  # 複数のセンサを区別するために使用できます
+  # chissoku の --tags に渡す値（JSON の tags フィールドに出る）
   tags:
     - Living
     - Floor1

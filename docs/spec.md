@@ -159,7 +159,6 @@ baud_rate: 9600
 
 mackerel:
   service_name: environmental-sensors
-  api_key_env: MACKEREL_API_KEY
   post_interval_sec: 60
   timeout_sec: 30
 
