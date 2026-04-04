@@ -1,19 +1,21 @@
 [Unit]
 Description=Chissoku to Mackerel Forwarder
 Documentation=https://github.com/nakataki17/co2-mackerel
-After=network-online.target
+After=network-online.target docker.service
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=chissoku
 Group=dialout
+# chissoku を Docker で起動するため（docker ソケット利用）
+SupplementaryGroups=docker
 
 # 実行ファイルのパス（symlink 経由でバージョン管理）
 # 設定は EnvironmentFile のみ（手順は docs/deployment.md）
 ExecStart=/opt/chissoku-forwarder/current/forwarder
 
-# 環境変数ファイル（MACKEREL_API_KEY, CHISSOKU_BIN など）
+# 環境変数ファイル（MACKEREL_API_KEY, DEVICE, CHISSOKU_* など）
 EnvironmentFile=/etc/chissoku-forwarder/forwarder.env
 
 # 再起動設定

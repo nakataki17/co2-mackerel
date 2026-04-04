@@ -18,43 +18,52 @@
 
 ## 2. 全体の流れ（ざっくり）
 
-1. PC の **CPU の種類（アーキテクチャ）** を確認する  
-2. **chissoku** と **forwarder** の実行ファイルを、その PC 向けに用意する  
-3. ディレクトリを作り、バイナリと **環境変数ファイル** を置く  
-4. **専用ユーザー**を作り、シリアルポートを読めるようにする  
-5. **systemd** に登録して自動起動する  
-6. ログと Mackerel で動作を確認する  
+1. **Docker** を入れ、[公式イメージ](https://github.com/northeye/chissoku/pkgs/container/chissoku)を `docker pull` しておく（初回のみ）  
+2. PC の **CPU（アーキテクチャ）** を確認する（**forwarder** のバイナリ向け。chissoku はコンテナ内で動く）  
+3. **forwarder** だけをビルドし、配置する  
+4. ディレクトリを作り、**環境変数ファイル** を置く  
+5. **専用ユーザー**を作り、**シリアル**用 `dialout` と **Docker** 用 `docker` グループを付与する  
+6. **systemd** に登録して自動起動する  
+7. ログと Mackerel で動作を確認する  
 
 ---
 
-## 3. アーキテクチャの確認
+## 3. アーキテクチャの確認（forwarder 用）
 
-ミニ PC で次を実行します。
+**chissoku** はコンテナ（[公式例](https://github.com/northeye/chissoku)の `docker run ... ghcr.io/northeye/chissoku`）で動かす前提なので、**ホストに chissoku の単体バイナリは不要**です。イメージは CPU 向けにビルド済みが配布されます。
+
+一方、**forwarder** はホスト上の Go バイナリなので、ビルド／コピーするときはミニ PC の CPU と一致させます。
 
 ```bash
 uname -m
 ```
 
-| 出力の例 | 意味（ざっくり） | chissoku のリリース名の目安 |
-|----------|------------------|-----------------------------|
-| `x86_64` | 一般的な 64bit PC | `linux-amd64` |
-| `aarch64` | 64bit ARM（Raspberry Pi 4 以降など） | `linux-arm64` |
+| 出力の例 | 意味（ざっくり） | forwarder をクロスビルドするときの `GOARCH` の目安 |
+|----------|------------------|---------------------------------------------------|
+| `x86_64` | 一般的な 64bit PC | `amd64` |
+| `aarch64` | 64bit ARM など | `arm64` |
 
-**PC と違う名前のバイナリ**を置くと動きません。必ず一致させてください。
+**forwarder のバイナリ**が PC と違うアーキテクチャだと動きません。
 
 ---
 
-## 4. chissoku の入手と配置
+## 4. Docker と chissoku イメージ
 
-1. [chissoku の Releases](https://github.com/northeye/chissoku/releases) から、**Linux かつ自分の CPU に合う** zip/tar をダウンロードします。  
-2. 中の **`chissoku` という名前の実行ファイル**だけ取り出します。  
-3. 後で使うので、いったん分かる場所に置きます（次の「ディレクトリ構成」で正式な場所に移します）。
-
-実行権限を付けます。
+1. [Docker Engine](https://docs.docker.com/engine/install/) をインストールします（ディストリビューションごとの手順に従ってください）。  
+2. 動作確認: `docker run --rm hello-world`  
+3. chissoku イメージを取得します（forwarder は起動のたびに `docker run` しますが、初めに pull しておくと失敗しにくいです）。
 
 ```bash
-chmod +x chissoku
+sudo docker pull ghcr.io/northeye/chissoku:latest
 ```
+
+手動で試す場合の例（センサ接続後）:
+
+```bash
+sudo docker run --rm -it --device /dev/ttyACM0:/dev/ttyACM0 ghcr.io/northeye/chissoku:latest -q /dev/ttyACM0
+```
+
+forwarder 実行ユーザーは **`docker` グループ**に入れるか、`docker` コマンドに相当する権限が必要です（後述）。
 
 ---
 
@@ -85,16 +94,15 @@ sudo mkdir -p /opt/chissoku-forwarder/current
 sudo mkdir -p /etc/chissoku-forwarder
 ```
 
-### 6.2 バイナリを置く
+### 6.2 forwarder バイナリを置く
+
+chissoku は **Docker イメージ**で配布される想定のため、ホストに `chissoku` 実行ファイルは置きません。
 
 - `forwarder` → `/opt/chissoku-forwarder/current/forwarder`  
-- `chissoku` → `/opt/chissoku-forwarder/current/chissoku`  
 
 ```bash
 sudo cp forwarder /opt/chissoku-forwarder/current/forwarder
-sudo cp chissoku /opt/chissoku-forwarder/current/chissoku
 sudo chmod +x /opt/chissoku-forwarder/current/forwarder
-sudo chmod +x /opt/chissoku-forwarder/current/chissoku
 ```
 
 ### 6.3 環境変数ファイル（秘密と設定をまとめる）
@@ -111,8 +119,8 @@ sudo nano /etc/chissoku-forwarder/forwarder.env
 # Mackerel（必須: 送信したい場合）
 MACKEREL_API_KEY=ここにあなたのAPIキー
 
-# chissoku の場所（この例では上記パス）
-CHISSOKU_BIN=/opt/chissoku-forwarder/current/chissoku
+# 省略可（省略時は ghcr.io/northeye/chissoku:latest）
+# CHISSOKU_DOCKER_IMAGE=ghcr.io/northeye/chissoku:latest
 
 # シリアルデバイス（多くの Linux で /dev/ttyACM0）
 DEVICE=/dev/ttyACM0
@@ -145,9 +153,9 @@ sudo chown root:root /etc/chissoku-forwarder/forwarder.env
 
 ---
 
-## 7. 専用ユーザーとシリアルポート
+## 7. 専用ユーザー・シリアル・Docker
 
-センサのデバイス（例: `/dev/ttyACM0`）は、通常 **root か `dialout` グループ**だけが読み書きできます。forwarder を **root 以外**で動かすなら、`dialout` に入れます。
+センサのデバイス（例: `/dev/ttyACM0`）は、通常 **root か `dialout` グループ**だけが読み書きできます。また forwarder は **`docker run` で chissoku を起動**するため、実行ユーザーは **`docker` グループ**（Docker ソケットを使える権限）が必要です。
 
 ### 7.1 ユーザーを作る（例: 名前は `chissoku`）
 
@@ -155,11 +163,13 @@ sudo chown root:root /etc/chissoku-forwarder/forwarder.env
 sudo useradd --system --home /nonexistent --shell /usr/sbin/nologin chissoku
 ```
 
-### 7.2 グループに入れる
+### 7.2 グループに入れる（`dialout` と `docker`）
 
 ```bash
-sudo usermod -aG dialout chissoku
+sudo usermod -aG dialout,docker chissoku
 ```
+
+`docker` グループを変えたあと、**既にログイン中のセッション**では反映されないことがあります。サービス再起動後に `systemctl status` で確認してください。
 
 ### 7.3 所有権（必要なら）
 
@@ -234,7 +244,8 @@ journalctl -u chissoku-forwarder -f
 | 現象 | 確認すること |
 |------|----------------|
 | `Permission denied`（シリアル） | ユーザーが `dialout` か、`/dev/ttyACM0` のパスが正しいか |
-| `cannot execute binary file` | chissoku / forwarder の **アーキテクチャ**が PC と一致しているか |
+| `cannot execute binary file` | **forwarder** の **アーキテクチャ**が PC と一致しているか |
+| `permission denied`（docker） | ユーザーが **`docker` グループ**か、`docker` の権限設定を確認 |
 | Mackerel に出ない | `MACKEREL_API_KEY`、サービス名、メトリクス名、ネットワーク（HTTPS が通るか） |
 | すぐ落ちる | `journalctl -u chissoku-forwarder -n 50` でエラー全文を確認 |
 
@@ -263,9 +274,67 @@ sudo systemctl daemon-reload
 
 ---
 
+## 14. SSH から手元の PC でデプロイ（更新）する
+
+いまのように **手元の PC からミニ PC へ SSH** している場合、次のどちらかが扱いやすいです。
+
+### パターン A: ミニ PC 上にリポジトリを clone しておく（`pull`）
+
+ミニ PC に **Go** と **git** を入れておき、例えば `~/co2-mackerel` に clone します。
+
+手元で（リポジトリのルートにいる想定）:
+
+```bash
+chmod +x scripts/deploy-remote.sh
+./scripts/deploy-remote.sh pull あなたのユーザー名@ミニPCのホスト名
+```
+
+リポジトリを `~/co2-mackerel` 以外に置いている場合は第 3 引数に **リモート側の絶対パス**を渡します。
+
+```bash
+./scripts/deploy-remote.sh pull user@mini-pc /home/user/proj/co2-mackerel
+```
+
+スクリプトは SSH でリモートに入り、`git pull` → `go build` → `/opt/chissoku-forwarder/current/forwarder` へ配置 → `systemctl restart` まで実行します。`sudo` のパスワードを聞かれる場合は、ミニ PC 上のユーザーに **sudo 権限**がある必要があります。
+
+### パターン B: 手元でビルドしてバイナリだけ送る（`copy`）
+
+ミニ PC に **Go を入れない**運用向けです。手元で **Linux 用**バイナリをビルドし、`scp` で送ります。スクリプトが **`ssh 先の CPU（uname -m）`** を見て `GOARCH` を選びます。
+
+```bash
+chmod +x scripts/deploy-remote.sh
+./scripts/deploy-remote.sh copy user@mini-pc
+```
+
+手元の OS が Linux / macOS / WSL なら通常そのまま動きます。手元が Windows の場合は Git Bash や WSL で実行してください。
+
+### スクリプトの既定値を変えたいとき
+
+環境変数で上書きできます（上級者向け）。
+
+| 変数 | 既定 | 意味 |
+|------|------|------|
+| `FORWARDER_INSTALL` | `/opt/chissoku-forwarder/current/forwarder` | 配置先のパス |
+| `SERVICE` | `chissoku-forwarder` | `systemctl restart` するユニット名 |
+
+例:
+
+```bash
+FORWARDER_INSTALL=/usr/local/bin/forwarder SERVICE=my-forwarder ./scripts/deploy-remote.sh copy user@mini-pc
+```
+
+### SSH の準備（初心者向けメモ）
+
+- 初回だけ `ssh user@ミニPC` で接続テストし、**ホスト鍵の確認**を済ませておくとスクリプトが止まりにくいです。
+- **公開鍵認証**（`ssh-copy-id` など）にしておくと、パスワード入力の手間が減ります。
+- スクリプトは **`forwarder` のバイナリと `systemctl restart` だけ**です。Docker イメージの `docker pull` や `forwarder.env` の編集はミニ PC 上で別途行ってください。
+
+---
+
 ## 関連ファイル
 
 | パス | 内容 |
 |------|------|
 | [docs/spec.md](spec.md) | JSON / API / 環境変数の一覧 |
 | [contrib/chissoku-forwarder.service](../contrib/chissoku-forwarder.service) | systemd のひな型 |
+| [scripts/deploy-remote.sh](../scripts/deploy-remote.sh) | SSH 経由でビルド・配置・再起動する補助スクリプト |

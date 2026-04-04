@@ -41,7 +41,8 @@ func run(ctx context.Context) error {
 	}
 
 	opt := chissoku.RunOptions{
-		BinPath:           os.Getenv("CHISSOKU_BIN"),
+		DockerImage:       getenvDefault("CHISSOKU_DOCKER_IMAGE", chissoku.DefaultDockerImage),
+		DockerExe:         os.Getenv("CHISSOKU_DOCKER_EXE"),
 		Device:            getenvDefault("DEVICE", "/dev/ttyACM0"),
 		StdoutIntervalSec: interval,
 	}
