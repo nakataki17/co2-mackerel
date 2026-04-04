@@ -2,22 +2,22 @@
 
 [chissoku](https://github.com/northeye/chissoku) の標準出力（JSON）を読み、[Mackerel](https://mackerel.io/) のサービスメトリクスへ送るフォワーダーです。
 
-**chissoku は Docker コンテナ**（例: `ghcr.io/northeye/chissoku:latest`）として起動します。ホストに chissoku の単体バイナリは不要です。
+**chissoku はホスト上の Linux 用バイナリ**として置き、環境変数 **`CHISSOKU_BIN`** でパスを指定します。
 
 ## ドキュメント
 
 | ファイル | 内容 |
 |----------|------|
-| [docs/deployment.md](docs/deployment.md) | Linux へのデプロイ手順（Docker・**SSH からの更新**含む） |
+| [docs/deployment.md](docs/deployment.md) | Linux へのデプロイ手順（**SSH からの更新**含む） |
 | [scripts/deploy-remote.sh](scripts/deploy-remote.sh) | SSH でミニ PC に forwarder を載せ替える補助スクリプト |
 | [docs/milestone.md](docs/milestone.md) | マイルストーン・学習用の進め方 |
 | [docs/spec.md](docs/spec.md) | 入出力フォーマット・API・**環境変数一覧** |
 
 ## 前提
 
-- **Docker**（`docker` コマンドが使えること。forwarder 実行ユーザーは `docker` グループなどが必要）
+- **chissoku** の Linux 用実行ファイル（対象 CPU アーキテクチャ向け）を配置し、`CHISSOKU_BIN` にそのパスを設定する
 - Go（`go.mod` の `go` 行に合わせて forwarder をビルド）
-- シリアルデバイスは `--device` でコンテナに渡す（`DEVICE` 環境変数、既定 `/dev/ttyACM0`）
+- シリアルデバイスは chissoku にデバイスパスで渡す（`DEVICE` 環境変数、既定 `/dev/ttyACM0`）。読み取り権限（例: `dialout`）が必要
 
 ## 設定
 
@@ -33,6 +33,7 @@ go test ./...
 ```
 
 ```bash
+export CHISSOKU_BIN="/path/to/chissoku"
 export MACKEREL_API_KEY="..."   # Mackerel に送るとき
 go run ./cmd/forwarder
 ```
@@ -40,6 +41,7 @@ go run ./cmd/forwarder
 センサ値だけ読んで表示し、Mackerel には送らない（試運転）:
 
 ```bash
+export CHISSOKU_BIN="/path/to/chissoku"
 go run ./cmd/forwarder --dry-run
 ```
 

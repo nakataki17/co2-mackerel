@@ -18,52 +18,52 @@
 
 ## 2. 全体の流れ（ざっくり）
 
-1. **Docker** を入れ、[公式イメージ](https://github.com/northeye/chissoku/pkgs/container/chissoku)を `docker pull` しておく（初回のみ）  
-2. PC の **CPU（アーキテクチャ）** を確認する（**forwarder** のバイナリ向け。chissoku はコンテナ内で動く）  
-3. **forwarder** だけをビルドし、配置する  
-4. ディレクトリを作り、**環境変数ファイル** を置く  
-5. **専用ユーザー**を作り、**シリアル**用 `dialout` と **Docker** 用 `docker` グループを付与する  
+1. PC の **CPU（アーキテクチャ）** を確認する（**chissoku** と **forwarder** の両方のバイナリ向け）  
+2. **chissoku** の Linux 用バイナリをミニ PC に置く（公式リリースや自前ビルドなど）  
+3. **forwarder** をビルドし、配置する  
+4. ディレクトリを作り、**環境変数ファイル** を置く（`CHISSOKU_BIN` など）  
+5. **専用ユーザー**を作り、**シリアル**用 `dialout` グループを付与する  
 6. **systemd** に登録して自動起動する  
 7. ログと Mackerel で動作を確認する  
 
 ---
 
-## 3. アーキテクチャの確認（forwarder 用）
+## 3. アーキテクチャの確認（chissoku・forwarder 用）
 
-**chissoku** はコンテナ（[公式例](https://github.com/northeye/chissoku)の `docker run ... ghcr.io/northeye/chissoku`）で動かす前提なので、**ホストに chissoku の単体バイナリは不要**です。イメージは CPU 向けにビルド済みが配布されます。
-
-一方、**forwarder** はホスト上の Go バイナリなので、ビルド／コピーするときはミニ PC の CPU と一致させます。
+**chissoku** も **forwarder** も、ミニ PC 上で動く **ネイティブの Linux バイナリ**です。ビルド／コピーするときは **同じ CPU アーキテクチャ** に合わせます。
 
 ```bash
 uname -m
 ```
 
-| 出力の例 | 意味（ざっくり） | forwarder をクロスビルドするときの `GOARCH` の目安 |
-|----------|------------------|---------------------------------------------------|
+| 出力の例 | 意味（ざっくり） | クロスビルドするときの `GOARCH` の目安 |
+|----------|------------------|----------------------------------------|
 | `x86_64` | 一般的な 64bit PC | `amd64` |
 | `aarch64` | 64bit ARM など | `arm64` |
 
-**forwarder のバイナリ**が PC と違うアーキテクチャだと動きません。
+**chissoku・forwarder のバイナリ**が PC と違うアーキテクチャだと動きません。
+
+[chissoku](https://github.com/northeye/chissoku) のリリースやビルド手順に従い、対象アーキテクチャ用の実行ファイルを用意してください。配置先の例は次節です。
 
 ---
 
-## 4. Docker と chissoku イメージ
+## 4. chissoku バイナリの配置
 
-1. [Docker Engine](https://docs.docker.com/engine/install/) をインストールします（ディストリビューションごとの手順に従ってください）。  
-2. 動作確認: `docker run --rm hello-world`  
-3. chissoku イメージを取得します（forwarder は起動のたびに `docker run` しますが、初めに pull しておくと失敗しにくいです）。
+例として **`/opt/chissoku/chissoku`** に置き、実行権を付けます（パスは任意で、`CHISSOKU_BIN` と一致させます）。
 
 ```bash
-sudo docker pull ghcr.io/northeye/chissoku:latest
+sudo mkdir -p /opt/chissoku
+sudo cp /path/to/chissoku /opt/chissoku/chissoku
+sudo chmod +x /opt/chissoku/chissoku
 ```
 
-手動で試す場合の例（センサ接続後）:
+センサ接続後、手動で 1 行出るか試す例（`forwarder.env` と同じ `DEVICE` を想定）:
 
 ```bash
-sudo docker run --rm -it --device /dev/ttyACM0:/dev/ttyACM0 ghcr.io/northeye/chissoku:latest -q /dev/ttyACM0
+/opt/chissoku/chissoku -q --stdout.interval=5 /dev/ttyACM0
 ```
 
-forwarder 実行ユーザーは **`docker` グループ**に入れるか、`docker` コマンドに相当する権限が必要です（後述）。
+シリアル権限が足りない場合は、試すユーザーが `dialout` に入っているか、`sudo` で確認してください。
 
 ---
 
@@ -96,9 +96,8 @@ sudo mkdir -p /etc/chissoku-forwarder
 
 ### 6.2 forwarder バイナリを置く
 
-chissoku は **Docker イメージ**で配布される想定のため、ホストに `chissoku` 実行ファイルは置きません。
-
 - `forwarder` → `/opt/chissoku-forwarder/current/forwarder`  
+- chissoku は **4 章**のとおり別パス（例: `/opt/chissoku/chissoku`）に置き、`CHISSOKU_BIN` で指定します。
 
 ```bash
 sudo cp forwarder /opt/chissoku-forwarder/current/forwarder
@@ -119,8 +118,8 @@ sudo nano /etc/chissoku-forwarder/forwarder.env
 # Mackerel（必須: 送信したい場合）
 MACKEREL_API_KEY=ここにあなたのAPIキー
 
-# 省略可（省略時は ghcr.io/northeye/chissoku:latest）
-# CHISSOKU_DOCKER_IMAGE=ghcr.io/northeye/chissoku:latest
+# chissoku の実行ファイル（必須）
+CHISSOKU_BIN=/opt/chissoku/chissoku
 
 # シリアルデバイス（多くの Linux で /dev/ttyACM0）
 DEVICE=/dev/ttyACM0
@@ -153,9 +152,9 @@ sudo chown root:root /etc/chissoku-forwarder/forwarder.env
 
 ---
 
-## 7. 専用ユーザー・シリアル・Docker
+## 7. 専用ユーザー・シリアル
 
-センサのデバイス（例: `/dev/ttyACM0`）は、通常 **root か `dialout` グループ**だけが読み書きできます。また forwarder は **`docker run` で chissoku を起動**するため、実行ユーザーは **`docker` グループ**（Docker ソケットを使える権限）が必要です。
+センサのデバイス（例: `/dev/ttyACM0`）は、通常 **root か `dialout` グループ**だけが読み書きできます。forwarder（および子プロセスの chissoku）を動かすユーザーは **`dialout`** に入れてください。
 
 ### 7.1 ユーザーを作る（例: 名前は `chissoku`）
 
@@ -163,13 +162,13 @@ sudo chown root:root /etc/chissoku-forwarder/forwarder.env
 sudo useradd --system --home /nonexistent --shell /usr/sbin/nologin chissoku
 ```
 
-### 7.2 グループに入れる（`dialout` と `docker`）
+### 7.2 グループに入れる（`dialout`）
 
 ```bash
-sudo usermod -aG dialout,docker chissoku
+sudo usermod -aG dialout chissoku
 ```
 
-`docker` グループを変えたあと、**既にログイン中のセッション**では反映されないことがあります。サービス再起動後に `systemctl status` で確認してください。
+グループを変えたあと、**既にログイン中のセッション**では反映されないことがあります。サービス再起動後に `systemctl status` で確認してください。
 
 ### 7.3 所有権（必要なら）
 
@@ -229,6 +228,7 @@ journalctl -u chissoku-forwarder -f
 - `MACKEREL_API_KEY is not set` と出る場合は、**環境変数ファイルのパス**と **`MACKEREL_API_KEY=` の行**を確認してください。
 
 **センサ値だけ試す**（Mackerel には送らない）: 同じ `forwarder.env` を読み込んだシェルで  
+`set -a && source /etc/chissoku-forwarder/forwarder.env && set +a` のあと  
 `/opt/chissoku-forwarder/current/forwarder --dry-run` を実行する（[docs/spec.md](spec.md) の `--dry-run`）。
 
 ---
@@ -247,8 +247,8 @@ journalctl -u chissoku-forwarder -f
 | 現象 | 確認すること |
 |------|----------------|
 | `Permission denied`（シリアル） | ユーザーが `dialout` か、`/dev/ttyACM0` のパスが正しいか |
-| `cannot execute binary file` | **forwarder** の **アーキテクチャ**が PC と一致しているか |
-| `permission denied`（docker） | ユーザーが **`docker` グループ**か、`docker` の権限設定を確認 |
+| `cannot execute binary file` | **chissoku** または **forwarder** の **アーキテクチャ**が PC と一致しているか |
+| `CHISSOKU_BIN is not set` | `forwarder.env` に **`CHISSOKU_BIN=`** があり、パスが実在するか |
 | Mackerel に出ない | `MACKEREL_API_KEY`、サービス名、メトリクス名、ネットワーク（HTTPS が通るか） |
 | すぐ落ちる | `journalctl -u chissoku-forwarder -n 50` でエラー全文を確認 |
 
@@ -330,7 +330,7 @@ FORWARDER_INSTALL=/usr/local/bin/forwarder SERVICE=my-forwarder ./scripts/deploy
 
 - 初回だけ `ssh user@ミニPC` で接続テストし、**ホスト鍵の確認**を済ませておくとスクリプトが止まりにくいです。
 - **公開鍵認証**（`ssh-copy-id` など）にしておくと、パスワード入力の手間が減ります。
-- スクリプトは **`forwarder` のバイナリと `systemctl restart` だけ**です。Docker イメージの `docker pull` や `forwarder.env` の編集はミニ PC 上で別途行ってください。
+- スクリプトは **`forwarder` のバイナリと `systemctl restart` だけ**です。`chissoku` バイナリの配置や `forwarder.env` の編集はミニ PC 上で別途行ってください。
 
 ---
 
