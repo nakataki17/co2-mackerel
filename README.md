@@ -25,27 +25,34 @@
 
 API キーは **`MACKEREL_API_KEY`**（固定の変数名）に設定します。
 
-## ビルド・テスト・実行
+## ビルド・テスト
 
 ```bash
 go build -o bin/forwarder ./cmd/forwarder
 go test ./...
 ```
 
+## 実行
+
+forwarder は **設定ファイルを読みません**。渡るのは **環境変数だけ**です。
+
+- **systemd で常時起動**するとき: [docs/deployment.md](docs/deployment.md) のとおり `/etc/chissoku-forwarder/forwarder.env` に変数を書き、ユニットの `EnvironmentFile=` で読み込む（手動で `export` は不要）。
+- **手元で `go run` するとき**: 同じ `KEY=value` 形式のファイルを **シェルが `source` して**環境に載せる必要があります。ひな型は [forwarder.env.example](forwarder.env.example)（`MACKEREL_API_KEY` などを編集してから）。
+
 ```bash
-export CHISSOKU_BIN="/path/to/chissoku"
-export MACKEREL_API_KEY="..."   # Mackerel に送るとき
+cp forwarder.env.example forwarder.env   # 初回のみ。forwarder.env を編集（CHISSOKU_BIN・MACKEREL_API_KEY 等）
+set -a && source ./forwarder.env && set +a
 go run ./cmd/forwarder
 ```
 
-センサ値だけ読んで表示し、Mackerel には送らない（試運転）:
+試運転（Mackerel には送らない）:
 
 ```bash
-export CHISSOKU_BIN="/path/to/chissoku"
+set -a && source ./forwarder.env && set +a
 go run ./cmd/forwarder --dry-run
 ```
 
-[docs/deployment.md](docs/deployment.md) の `forwarder.env` 例も参照してください。
+変数を個別に `export` して動かすこともできますが、運用では **1 ファイルにまとめて source** か **systemd の EnvironmentFile** に揃えるのが扱いやすいです。
 
 ## ライセンス
 

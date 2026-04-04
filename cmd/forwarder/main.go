@@ -55,6 +55,9 @@ func run(ctx context.Context, dryRun bool) error {
 	metricsPrefix := getenvDefault("MACKEREL_METRICS_PREFIX", "co2.living")
 	baseURL := getenvDefault("MACKEREL_API_BASE", mackerel.DefaultBaseURL)
 
+	fmt.Fprintf(os.Stderr, "forwarder: MACKEREL_SERVICE_NAME=%s\n", serviceName)
+	fmt.Fprintf(os.Stderr, "forwarder: MACKEREL_METRICS_PREFIX=%s\n", metricsPrefix)
+
 	timeout := 30 * time.Second
 	if s := os.Getenv("MACKEREL_TIMEOUT_SEC"); s != "" {
 		if v, err := strconv.Atoi(s); err == nil && v > 0 {
