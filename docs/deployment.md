@@ -228,6 +228,9 @@ journalctl -u chissoku-forwarder -f
 - センサ値が **標準出力に相当する行**として出ていれば、読み取りは成功に近いです。  
 - `MACKEREL_API_KEY is not set` と出る場合は、**環境変数ファイルのパス**と **`MACKEREL_API_KEY=` の行**を確認してください。
 
+**センサ値だけ試す**（Mackerel には送らない）: 同じ `forwarder.env` を読み込んだシェルで  
+`/opt/chissoku-forwarder/current/forwarder --dry-run` を実行する（[docs/spec.md](spec.md) の `--dry-run`）。
+
 ---
 
 ## 10. Mackerel 側の確認

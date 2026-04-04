@@ -37,6 +37,12 @@ export MACKEREL_API_KEY="..."   # Mackerel に送るとき
 go run ./cmd/forwarder
 ```
 
+センサ値だけ読んで表示し、Mackerel には送らない（試運転）:
+
+```bash
+go run ./cmd/forwarder --dry-run
+```
+
 [docs/deployment.md](docs/deployment.md) の `forwarder.env` 例も参照してください。
 
 ## ライセンス

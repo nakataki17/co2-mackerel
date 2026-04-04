@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,6 +20,9 @@ import (
 )
 
 func main() {
+	dryRun := flag.Bool("dry-run", false, "chissoku からセンサ値を読み、パースして表示するだけ（Mackerel には送らない）")
+	flag.Parse()
+
 	sigs := []os.Signal{os.Interrupt}
 	if runtime.GOOS != "windows" {
 		sigs = append(sigs, syscall.SIGTERM)
@@ -26,13 +30,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), sigs...)
 	defer stop()
 
-	if err := run(ctx); err != nil {
+	if err := run(ctx, *dryRun); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context) error {
+func run(ctx context.Context, dryRun bool) error {
 	interval := 60
 	if s := os.Getenv("CHISSOKU_INTERVAL_SEC"); s != "" {
 		if v, err := strconv.Atoi(s); err == nil && v > 0 {
@@ -61,6 +65,9 @@ func run(ctx context.Context) error {
 	httpClient := &http.Client{Timeout: timeout}
 
 	var skipMackerelOnce sync.Once
+	if dryRun {
+		fmt.Fprintln(os.Stderr, "forwarder: --dry-run（Mackerel POST は行いません）")
+	}
 
 	return chissoku.StreamLines(ctx, opt, func(line []byte) error {
 		r, err := reading.ParseLine(line)
@@ -68,6 +75,9 @@ func run(ctx context.Context) error {
 			return err
 		}
 		printReading(r)
+		if dryRun {
+			return nil
+		}
 		if apiKey == "" {
 			skipMackerelOnce.Do(func() {
 				fmt.Fprintln(os.Stderr, "mackerel: MACKEREL_API_KEY is not set; skipping POST")
